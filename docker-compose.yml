@@ -1,0 +1,62 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15
+    container_name: terrabite_db
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: terrabite
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database:/docker-entrypoint-initdb.d
+    networks:
+      - terrabite_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build: 
+      context: ./api
+      dockerfile: Dockerfile
+    container_name: terrabite_api
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://user:password@db/terrabite
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - terrabite_network
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        - NODE_ENV=production
+    container_name: terrabite_frontend
+    ports:
+      - "3000:3000"
+    depends_on:
+      - api
+    networks:
+      - terrabite_network
+    restart: unless-stopped
+    environment:
+      - NEXT_PUBLIC_API_URL=http://api:8000
+
+networks:
+  terrabite_network:
+    driver: bridge
+
+volumes:
+  postgres_data:
