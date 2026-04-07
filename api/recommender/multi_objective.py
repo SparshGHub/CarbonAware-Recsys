@@ -19,6 +19,16 @@ class MultiObjectiveRecommender(BaseRecommender):
         mode: str = "lifecycle_aware",
         context: Optional[Dict[str, Any]] = None
     ) -> List[RecommendationItem]:
+        context = context or {}
+
+        # Lambda controls carbon-vs-relevance trade-off.
+        lambda_value = context.get("lambda", 0.6)
+        try:
+            lambda_value = float(lambda_value)
+        except (TypeError, ValueError):
+            lambda_value = 0.6
+        lambda_value = max(0.0, min(1.0, lambda_value))
+
         # 1. Fetch raw items
         raw_items = get_fallback_recommendations(query)
         
@@ -43,10 +53,10 @@ class MultiObjectiveRecommender(BaseRecommender):
                 total_score = relevance
             elif mode == "ingredient_aware":
                 carbon_utility = 1.0 / (item_carbon + 1.0)
-                total_score = (relevance * 0.5) + (carbon_utility * 0.5)
+                total_score = (relevance * (1.0 - lambda_value)) + (carbon_utility * lambda_value)
             else: # lifecycle_aware
                 carbon_utility = 1.0 / (total_carbon + 1.0)
-                total_score = (relevance * 0.4) + (carbon_utility * 0.6) # More weight to carbon in full mode
+                total_score = (relevance * (1.0 - lambda_value)) + (carbon_utility * lambda_value)
             
             results.append(RecommendationItem(
                 id=item["id"],

@@ -52,7 +52,7 @@ services:
       - terrabite_network
     restart: unless-stopped
     environment:
-      - NEXT_PUBLIC_API_URL=http://api:8000
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
 
 networks:
   terrabite_network:

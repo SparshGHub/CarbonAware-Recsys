@@ -14,6 +14,12 @@ const config: Config = {
         mono: ["var(--font-mono)", "monospace"],
       },
       colors: {
+        shell: {
+          ink: "#060b1d",
+          card: "#111a38",
+          cream: "#f8fafc",
+          fog: "#c5d1e8",
+        },
         obsidian: {
           50: '#f8fafc',
           100: '#f1f5f9',

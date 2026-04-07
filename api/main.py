@@ -1,17 +1,30 @@
-from typing import List, Optional, Dict
-from fastapi import FastAPI, Depends, HTTPException
+from typing import List
+from fastapi import FastAPI, Depends, Query
+from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 import os
 
-from .models import Base, City, Area, FoodItem
+from .models import Base, City
 from .recommender.base import RecommendationItem
-from .recommender.baseline import BaselineRecommender
 from .recommender.multi_objective import MultiObjectiveRecommender
 from .seed import seed_locations
 
 app = FastAPI(title="TerraBite API")
+
+allowed_origins = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=allowed_origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Database setup
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://user:password@db/terrabite")
@@ -48,10 +61,19 @@ async def recommend(
     city: str,
     area: str,
     mode: str = "lifecycle_aware",
+    limit: int = 5,
+    lambda_value: float = Query(0.6, alias="lambda", ge=0.0, le=1.0),
     db: Session = Depends(get_db)
 ):
     recommender = MultiObjectiveRecommender()
-    return await recommender.recommend(query, city, area, mode=mode)
+    return await recommender.recommend(
+        query,
+        city,
+        area,
+        limit=limit,
+        mode=mode,
+        context={"lambda": lambda_value},
+    )
 
 @app.get("/recommend/compare")
 async def compare(
