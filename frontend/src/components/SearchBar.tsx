@@ -26,53 +26,74 @@ export default function SearchBar({
     }
   };
 
+  const locationReady = Boolean(city && area);
+
+  const placeholder = locationReady
+    ? "Try: chicken tikka, paneer pizza, protein bowl, biryani..."
+    : "Select city and area first";
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: 0.1 }}
-      className="w-full max-w-2xl mx-auto"
+      className="mx-auto w-full max-w-4xl"
     >
-      <div className="bg-white rounded-2xl shadow-lg p-6">
-        <label className="block text-sm font-semibold text-gray-700 mb-3">
-          Search for food items
-        </label>
-        <div className="flex gap-3">
+      <div className="card-shell">
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <label className="text-sm font-semibold text-shell-cream">
+            Search for food intent
+          </label>
+          <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-medium text-shell-fog">
+            semantic query mapping enabled
+          </span>
+        </div>
+
+        <div className="flex flex-col gap-3 md:flex-row">
           <div className="relative flex-1">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+            <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-cyan-200/80" />
             <input
               type="text"
-              placeholder="e.g., chicken tikka, cheese pizza, biryani..."
+              placeholder={placeholder}
               value={value}
               onChange={(e) => onChange(e.target.value)}
-              onKeyPress={handleKeyPress}
-              disabled={loading || !city || !area}
-              className="w-full pl-11 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-green-500 focus:ring-2 focus:ring-green-500/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              onKeyDown={handleKeyPress}
+              disabled={loading || !locationReady}
+              className="w-full rounded-2xl border border-white/20 bg-shell-card/70 py-3.5 pl-11 pr-4 text-base text-shell-cream outline-none ring-0 placeholder:text-shell-fog/70 transition focus:border-cyan-300/70 focus:bg-shell-card disabled:cursor-not-allowed disabled:opacity-60"
             />
           </div>
+
           <motion.button
             onClick={onSearch}
-            disabled={loading || !value.trim() || !city || !area}
-            whileHover={!loading && value.trim() && city && area ? { scale: 1.05 } : {}}
-            whileTap={!loading && value.trim() && city && area ? { scale: 0.98 } : {}}
-            className="px-6 py-3 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 min-w-fit"
+            disabled={loading || !value.trim() || !locationReady}
+            whileHover={!loading && value.trim() && locationReady ? { y: -2 } : {}}
+            whileTap={!loading && value.trim() && locationReady ? { scale: 0.98 } : {}}
+            className="inline-flex min-w-36 items-center justify-center gap-2 rounded-2xl border border-lime-300/30 bg-lime-300/20 px-6 py-3.5 text-sm font-bold text-lime-100 transition hover:border-lime-200/80 hover:bg-lime-300/30 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {loading ? (
               <>
-                <Loader2 className="w-5 h-5 animate-spin" />
-                <span>Searching...</span>
+                <Loader2 className="h-5 w-5 animate-spin" />
+                <span>Searching</span>
               </>
             ) : (
               <>
-                <Search className="w-5 h-5" />
+                <Search className="h-5 w-5" />
                 <span>Search</span>
               </>
             )}
           </motion.button>
         </div>
-        {(!city || !area) && (
-          <p className="text-sm text-amber-600 mt-2">
-            Please select your city and area to search
+
+        {!locationReady && (
+          <p className="mt-3 text-sm text-coral-100/90">
+            Please choose city and area before searching.
+          </p>
+        )}
+
+        {locationReady && (
+          <p className="mt-3 text-xs text-shell-fog">
+            Requests include query, city, and area so delivery-emission adjustments are location
+            aware.
           </p>
         )}
       </div>

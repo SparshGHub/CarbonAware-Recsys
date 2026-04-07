@@ -2,7 +2,7 @@
 
 import { motion } from "framer-motion";
 import { LAMBDA_VALUES } from "@/config/constants";
-import { Leaf, TrendingUp } from "lucide-react";
+import { Leaf, SlidersHorizontal } from "lucide-react";
 
 interface LambdaSliderProps {
   value: number;
@@ -15,29 +15,41 @@ export default function LambdaSlider({
   onChange,
   loading,
 }: LambdaSliderProps) {
+  const currentIndex = Math.max(0, LAMBDA_VALUES.indexOf(value));
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newValue = parseFloat(e.target.value);
+    const nextIndex = Number(e.target.value);
+    const newValue = LAMBDA_VALUES[nextIndex] ?? value;
     onChange(newValue);
   };
+
+  const interpretation =
+    value <= 0.2
+      ? "Commercial intent dominates ranking"
+      : value < 0.7
+        ? "Taste and sustainability are balanced"
+        : "Sustainability dominates ranking";
 
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: 0.2 }}
-      className="w-full max-w-2xl mx-auto bg-white rounded-2xl shadow-lg p-6"
+      className="card-shell mx-auto w-full max-w-4xl"
     >
-      <div className="mb-6">
-        <div className="flex items-center justify-between mb-2">
-          <label className="flex items-center gap-2 text-sm font-semibold text-gray-700">
-            <Leaf className="w-5 h-5 text-green-600" />
-            Environmental Impact Weight
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <label className="flex items-center gap-2 text-sm font-semibold text-shell-cream">
+            <SlidersHorizontal className="h-5 w-5 text-cyan-200" />
+            Lambda: lifecycle carbon weight
           </label>
-          <span className="text-2xl font-bold text-green-600">{value.toFixed(1)}</span>
+          <p className="mt-1 text-xs text-shell-fog">
+            Slider triggers reranking for lifecycle-aware list only
+          </p>
         </div>
-        <p className="text-xs text-gray-600">
-          Adjust how much carbon emissions weight in recommendations
-        </p>
+        <span className="rounded-xl border border-lime-300/30 bg-lime-300/15 px-4 py-2 text-2xl font-bold text-lime-100">
+          {value.toFixed(1)}
+        </span>
       </div>
 
       {/* Slider */}
@@ -45,45 +57,51 @@ export default function LambdaSlider({
         <div className="relative pt-2">
           <input
             type="range"
-            min="0"
-            max="1"
-            step="0.1"
-            value={value}
+            min={0}
+            max={LAMBDA_VALUES.length - 1}
+            step={1}
+            value={currentIndex}
             onChange={handleChange}
             disabled={loading}
-            className="w-full h-3 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-green-600 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="lambda-slider w-full cursor-pointer appearance-none rounded-lg"
             style={{
-              background: `linear-gradient(to right, #ef4444 0%, #f59e0b 25%, #10b981 50%, #3b82f6 75%, #7c3aed 100%)`
+              background:
+                "linear-gradient(90deg, rgba(251,146,60,0.85) 0%, rgba(34,211,238,0.85) 45%, rgba(190,242,100,0.85) 100%)",
             }}
           />
         </div>
 
         {/* Labels */}
-        <div className="flex justify-between text-xs font-medium text-gray-600 px-1">
-          <div className="text-center flex-1">
-            <p className="text-red-600 font-semibold">0</p>
-            <p>Pure Taste</p>
-          </div>
-          <div className="text-center flex-1">
-            <p className="text-amber-600 font-semibold">0.5</p>
-            <p>Balanced</p>
-          </div>
-          <div className="text-center flex-1">
-            <p className="text-green-600 font-semibold">1.0</p>
-            <p>Eco Focus</p>
-          </div>
+        <div className="grid grid-cols-6 gap-1 text-center text-xs">
+          {LAMBDA_VALUES.map((point, idx) => {
+            const selected = point === value;
+            return (
+              <button
+                key={point}
+                type="button"
+                onClick={() => onChange(point)}
+                disabled={loading}
+                className={`rounded-lg border px-2 py-1.5 font-semibold transition ${
+                  selected
+                    ? "border-cyan-300/80 bg-cyan-300/20 text-cyan-100"
+                    : "border-white/15 bg-white/5 text-shell-fog hover:border-white/35"
+                }`}
+              >
+                {point.toFixed(1)}
+              </button>
+            );
+          })}
         </div>
       </div>
 
       {/* Info Box */}
-      <div className="mt-6 p-4 bg-green-50 rounded-lg border border-green-200">
-        <p className="text-xs text-gray-700">
-          <span className="font-semibold text-green-700">💡 Lambda = {value.toFixed(1)}:</span>
-          {value === 0 && " Pure commercial recommendations based on taste and popularity."}
-          {value > 0 && value < 0.5 && " Slight preference to lower-carbon options while maintaining taste."}
-          {value >= 0.5 && value < 0.7 && " Balanced approach between taste and environmental impact."}
-          {value >= 0.7 && value < 1 && " Strong preference for environmentally friendly choices."}
-          {value === 1 && " Maximum focus on minimizing carbon emissions."}
+      <div className="mt-6 rounded-2xl border border-white/15 bg-shell-card/70 p-4 text-sm text-shell-fog">
+        <p className="inline-flex items-center gap-2 font-semibold text-shell-cream">
+          <Leaf className="h-4 w-4 text-lime-200" />
+          {interpretation}
+        </p>
+        <p className="mt-2 text-xs">
+          Allowed values: {LAMBDA_VALUES.map((point) => point.toFixed(1)).join(" , ")}
         </p>
       </div>
     </motion.div>

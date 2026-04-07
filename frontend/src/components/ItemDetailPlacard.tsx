@@ -1,25 +1,21 @@
 "use client";
 
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Leaf, Package } from "lucide-react";
+import { X, Leaf, Building2, Route, Wallet } from "lucide-react";
 import { CARBON_GRADING } from "@/config/constants";
-
-interface Ingredient {
-  name: string;
-  amount?: number;
-  co2PerKg: number;
-  contribution: number;
-}
 
 interface FoodItem {
   id: string | number;
   name: string;
+  restaurantName: string;
   carbonScore: number;
+  deliveryCarbon: number;
+  totalCarbon: number;
   carbonGrade: "A" | "B" | "C" | "D" | "E";
-  description?: string;
   price?: number;
   distance?: number;
-  ingredients?: Ingredient[];
+  relevanceScore?: number;
+  totalScore?: number;
 }
 
 interface ItemDetailPlacard {
@@ -44,7 +40,7 @@ export default function ItemDetailPlacard({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-shell-ink/70 p-4 backdrop-blur-md"
           onClick={onClose}
         >
           <motion.div
@@ -53,16 +49,16 @@ export default function ItemDetailPlacard({
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
             transition={{ type: "spring", duration: 0.3 }}
             onClick={(e) => e.stopPropagation()}
-            className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
+            className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-3xl border border-white/20 bg-shell-card/95 shadow-[0_24px_80px_rgba(0,0,0,0.45)]"
           >
             {/* Close button */}
-            <div className="sticky top-0 bg-white border-b border-gray-200 p-6 flex items-center justify-between">
-              <h2 className="text-2xl font-bold text-gray-900">Item Details</h2>
+            <div className="sticky top-0 z-10 flex items-center justify-between border-b border-white/10 bg-shell-card/95 p-6">
+              <h2 className="font-display text-2xl font-semibold text-shell-cream">Item Details</h2>
               <button
                 onClick={onClose}
-                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                className="rounded-lg p-2 transition hover:bg-white/10"
               >
-                <X className="w-6 h-6 text-gray-600" />
+                <X className="h-6 w-6 text-shell-fog" />
               </button>
             </div>
 
@@ -70,15 +66,14 @@ export default function ItemDetailPlacard({
               {/* Header with grade */}
               <div className="flex items-start justify-between gap-4">
                 <div>
-                  <h3 className="text-3xl font-bold text-gray-900 mb-2">
-                    {item.name}
-                  </h3>
-                  {item.description && (
-                    <p className="text-gray-600">{item.description}</p>
-                  )}
+                  <h3 className="mb-2 font-display text-3xl font-semibold text-shell-cream">{item.name}</h3>
+                  <p className="inline-flex items-center gap-2 text-sm text-shell-fog">
+                    <Building2 className="h-4 w-4 text-cyan-100" />
+                    {item.restaurantName}
+                  </p>
                 </div>
                 <motion.div
-                  className="w-20 h-20 rounded-full flex items-center justify-center font-bold text-white text-3xl shadow-lg flex-shrink-0"
+                  className="flex h-20 w-20 flex-shrink-0 items-center justify-center rounded-full text-3xl font-black text-shell-ink shadow-lg"
                   style={{ backgroundColor: gradeInfo.color }}
                   whileHover={{ scale: 1.05 }}
                 >
@@ -88,22 +83,40 @@ export default function ItemDetailPlacard({
 
               {/* Basic info grid */}
               <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                <div className="p-4 bg-green-50 rounded-lg border border-green-200">
-                  <p className="text-sm text-gray-600 mb-1">Carbon Emissions</p>
-                  <p className="text-2xl font-bold text-green-700">
-                    {item.carbonScore.toFixed(2)} kg CO₂
+                <div className="rounded-xl border border-white/10 bg-white/5 p-4">
+                  <p className="mb-1 text-sm text-shell-fog">Total Carbon</p>
+                  <p className="text-2xl font-bold text-shell-cream">
+                    {item.totalCarbon.toFixed(2)} kg CO₂e
                   </p>
                 </div>
-                {item.price && (
-                  <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
-                    <p className="text-sm text-gray-600 mb-1">Price</p>
-                    <p className="text-2xl font-bold text-blue-700">₹{item.price.toFixed(0)}</p>
+                <div className="rounded-xl border border-white/10 bg-white/5 p-4">
+                  <p className="mb-1 text-sm text-shell-fog">Food Carbon</p>
+                  <p className="text-2xl font-bold text-shell-cream">
+                    {item.carbonScore.toFixed(2)} kg CO₂e
+                  </p>
+                </div>
+                <div className="rounded-xl border border-white/10 bg-white/5 p-4">
+                  <p className="mb-1 text-sm text-shell-fog">Delivery Carbon</p>
+                  <p className="text-2xl font-bold text-shell-cream">
+                    {item.deliveryCarbon.toFixed(2)} kg CO₂e
+                  </p>
+                </div>
+                {typeof item.price === "number" && (
+                  <div className="rounded-xl border border-white/10 bg-white/5 p-4">
+                    <p className="mb-1 inline-flex items-center gap-1 text-sm text-shell-fog">
+                      <Wallet className="h-4 w-4 text-lime-200" />
+                      Price
+                    </p>
+                    <p className="text-2xl font-bold text-shell-cream">₹{item.price.toFixed(0)}</p>
                   </div>
                 )}
-                {item.distance && (
-                  <div className="p-4 bg-amber-50 rounded-lg border border-amber-200">
-                    <p className="text-sm text-gray-600 mb-1">Distance</p>
-                    <p className="text-2xl font-bold text-amber-700">
+                {typeof item.distance === "number" && (
+                  <div className="rounded-xl border border-white/10 bg-white/5 p-4">
+                    <p className="mb-1 inline-flex items-center gap-1 text-sm text-shell-fog">
+                      <Route className="h-4 w-4 text-cyan-200" />
+                      Distance
+                    </p>
+                    <p className="text-2xl font-bold text-shell-cream">
                       {item.distance.toFixed(1)} km
                     </p>
                   </div>
@@ -111,81 +124,50 @@ export default function ItemDetailPlacard({
               </div>
 
               {/* Carbon Score explanation */}
-              <div className="p-4 bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl border border-green-200">
-                <div className="flex items-start gap-3 mb-3">
-                  <Leaf className="w-5 h-5 text-green-600 mt-1 flex-shrink-0" />
+              <div className="rounded-2xl border border-white/15 bg-white/5 p-4">
+                <div className="mb-3 flex items-start gap-3">
+                  <Leaf className="mt-1 h-5 w-5 flex-shrink-0 text-lime-200" />
                   <div>
-                    <p className="font-semibold text-gray-900">
+                    <p className="font-semibold text-shell-cream">
                       Carbon Emission Grade: <span style={{ color: gradeInfo.color }}>{item.carbonGrade}</span>
                     </p>
-                    <p className="text-sm text-gray-600 mt-1">
+                    <p className="mt-1 text-sm text-shell-fog">
                       This item has a carbon footprint of{" "}
-                      <span className="font-semibold">{item.carbonScore.toFixed(2)} kg CO₂</span>.
-                      This includes emissions from ingredient production, processing, packaging, and
-                      delivery to your location.
+                      <span className="font-semibold">{item.totalCarbon.toFixed(2)} kg CO₂e</span>.
+                      This includes food production and delivery impact for your selected location.
                     </p>
                   </div>
                 </div>
-                <div className="w-full bg-white rounded-full h-3 border border-gray-200">
+                <div className="h-3 w-full rounded-full border border-white/10 bg-white/10">
                   <motion.div
                     className="h-full rounded-full"
                     style={{ backgroundColor: gradeInfo.color }}
                     initial={{ width: 0 }}
-                    animate={{ width: `${Math.min((item.carbonScore / 10) * 100, 100)}%` }}
+                    animate={{ width: `${Math.min((item.totalCarbon / 12) * 100, 100)}%` }}
                     transition={{ duration: 0.8 }}
                   />
                 </div>
               </div>
 
-              {/* Ingredients breakdown */}
-              {item.ingredients && item.ingredients.length > 0 && (
-                <div className="space-y-3">
-                  <div className="flex items-center gap-2 mb-4">
-                    <Package className="w-5 h-5 text-orange-600" />
-                    <h4 className="font-semibold text-gray-900">Ingredients & Carbon Impact</h4>
-                  </div>
-                  <div className="space-y-2">
-                    {item.ingredients.map((ingredient, idx) => (
-                      <motion.div
-                        key={idx}
-                        initial={{ opacity: 0, x: -10 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: idx * 0.1 }}
-                        className="p-3 bg-gray-50 rounded-lg border border-gray-200 hover:border-orange-300 transition-colors"
-                      >
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="font-medium text-gray-900">
-                            {ingredient.name}
-                            {ingredient.amount && (
-                              <span className="text-sm text-gray-600 ml-2">({ingredient.amount} g)</span>
-                            )}
-                          </span>
-                          <span className="text-sm font-semibold text-orange-600">
-                            {ingredient.contribution.toFixed(3)} kg CO₂
-                          </span>
-                        </div>
-                        <div className="flex items-center justify-between text-xs text-gray-600">
-                          <span>{ingredient.co2PerKg.toFixed(2)} kg CO₂/kg</span>
-                          <div className="w-24 bg-gray-200 rounded-full h-1.5">
-                            <motion.div
-                              className="h-full rounded-full bg-orange-500"
-                              initial={{ width: 0 }}
-                              animate={{ width: `${Math.min((ingredient.contribution / 2) * 100, 100)}%` }}
-                              transition={{ duration: 0.6, delay: idx * 0.1 + 0.2 }}
-                            />
-                          </div>
-                        </div>
-                      </motion.div>
-                    ))}
-                  </div>
-                </div>
-              )}
+              <div className="rounded-2xl border border-white/10 bg-shell-ink/35 p-4 text-xs text-shell-fog">
+                Score insights:
+                {typeof item.relevanceScore === "number" && (
+                  <span className="ml-2 rounded bg-white/10 px-2 py-0.5 text-shell-cream">
+                    relevance {item.relevanceScore.toFixed(2)}
+                  </span>
+                )}
+                {typeof item.totalScore === "number" && (
+                  <span className="ml-2 rounded bg-white/10 px-2 py-0.5 text-shell-cream">
+                    ranking score {item.totalScore.toFixed(2)}
+                  </span>
+                )}
+              </div>
 
               {/* Footer */}
-              <div className="pt-4 border-t border-gray-200">
+              <div className="border-t border-white/10 pt-4">
                 <button
                   onClick={onClose}
-                  className="w-full py-3 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg transition-colors"
+                  className="w-full rounded-xl border border-lime-300/40 bg-lime-300/20 py-3 font-semibold text-lime-100 transition hover:border-lime-200/80 hover:bg-lime-300/30"
                 >
                   Close Details
                 </button>
