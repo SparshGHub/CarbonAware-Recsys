@@ -2,7 +2,7 @@
 
 import { motion } from "framer-motion";
 import { CarbonGrade, CARBON_GRADING } from "@/config/constants";
-import { ArrowUpRight, Building2, MapPinned, Coins } from "lucide-react";
+import { Building2, Coins, MapPinned, ChevronRight } from "lucide-react";
 
 interface FoodItem {
   id: string | number;
@@ -25,108 +25,135 @@ interface RecommendationCardProps {
   model: "baseline" | "carbon-aware";
 }
 
-export default function RecommendationCard({
-  item,
-  index,
-  onViewDetails,
-  model,
-}: RecommendationCardProps) {
+export default function RecommendationCard({ item, index, onViewDetails, model }: RecommendationCardProps) {
   const gradeInfo = CARBON_GRADING[item.carbonGrade];
-  const accentClass =
-    model === "carbon-aware"
-      ? "border-cyan-300/40 bg-cyan-300/10"
-      : "border-coral-300/40 bg-coral-300/10";
+  const accentColor = model === "carbon-aware" ? "#22d3ee" : "#fb923c";
+  const barPct = Math.min((item.totalCarbon / 10) * 100, 100);
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 20 }}
+      initial={{ opacity: 0, y: 22 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: index * 0.05 }}
-      whileHover={{ y: -6 }}
+      transition={{ delay: index * 0.07, type: "spring", stiffness: 260, damping: 26 }}
+      whileHover={{ y: -5, scale: 1.008 }}
       onClick={() => onViewDetails(item)}
-      className="group relative cursor-pointer overflow-hidden rounded-2xl border border-white/15 bg-shell-card/80 p-5 transition hover:border-white/30"
+      className="group relative cursor-pointer overflow-hidden rounded-2xl transition-shadow duration-300"
+      style={{
+        background: "linear-gradient(145deg, rgba(17,26,56,0.9) 0%, rgba(11,18,45,0.85) 100%)",
+        border: "1px solid rgba(255,255,255,0.09)",
+        boxShadow: "0 8px 24px rgba(0,0,0,0.35)",
+      }}
+      onMouseEnter={(e) => {
+        (e.currentTarget as HTMLElement).style.border = `1px solid ${accentColor}35`;
+        (e.currentTarget as HTMLElement).style.boxShadow = `0 16px 40px rgba(0,0,0,0.45), 0 0 0 1px ${accentColor}20`;
+      }}
+      onMouseLeave={(e) => {
+        (e.currentTarget as HTMLElement).style.border = "1px solid rgba(255,255,255,0.09)";
+        (e.currentTarget as HTMLElement).style.boxShadow = "0 8px 24px rgba(0,0,0,0.35)";
+      }}
     >
-      <div
-        className="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-300 group-hover:opacity-100"
-        style={{
-          background:
-            "linear-gradient(145deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0) 60%)",
-        }}
-      />
+      {/* Subtle top sheen */}
+      <div className="absolute inset-x-0 top-0 h-px"
+        style={{ background: `linear-gradient(90deg, transparent, ${accentColor}40, transparent)` }} />
 
-      <div className="relative z-10 flex items-start justify-between gap-4">
-        <div>
-          <div className={`mb-2 inline-flex items-center gap-2 rounded-full border px-2.5 py-1 text-[11px] font-bold ${accentClass}`}>
-            #{index + 1}
-            <span className="text-shell-fog">{model === "carbon-aware" ? "Lifecycle" : "Commercial"}</span>
+      {/* Ambient corner glow */}
+      <div className="absolute -bottom-8 -right-8 h-24 w-24 rounded-full blur-2xl pointer-events-none"
+        style={{ background: `${gradeInfo.color}30` }} />
+
+      <div className="relative z-10 p-5">
+        {/* Top row: rank + grade badge */}
+        <div className="flex items-start justify-between gap-3 mb-4">
+          <div className="flex items-center gap-2.5">
+            {/* Rank number */}
+            <div
+              className="animate-rank-pop flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-xl text-sm font-black"
+              style={{
+                background: `${accentColor}18`,
+                border: `1.5px solid ${accentColor}40`,
+                color: accentColor,
+              }}
+            >
+              #{index + 1}
+            </div>
+            <div>
+              <h3 className="text-base font-bold leading-snug" style={{ color: "#f8fafc" }}>
+                {item.name}
+              </h3>
+              <p className="flex items-center gap-1 text-xs mt-0.5" style={{ color: "#64748b" }}>
+                <Building2 className="h-3 w-3" />
+                {item.restaurantName}
+              </p>
+            </div>
           </div>
-          <h3 className="pr-6 text-lg font-semibold leading-snug text-shell-cream">{item.name}</h3>
-        </div>
 
-        <motion.div
-          className="flex h-12 w-12 items-center justify-center rounded-full text-lg font-black text-shell-ink shadow-lg"
-          style={{ backgroundColor: gradeInfo.color }}
-          whileHover={{ scale: 1.06 }}
-        >
-          {item.carbonGrade}
-        </motion.div>
-      </div>
-
-      <div className="relative z-10 mt-4 grid grid-cols-1 gap-3 text-sm text-shell-fog sm:grid-cols-2">
-        <div className="rounded-xl border border-white/10 bg-white/5 p-3">
-          <p className="text-[11px] uppercase tracking-wide text-shell-fog/80">Total Carbon</p>
-          <p className="mt-1 text-base font-semibold text-shell-cream">
-            {item.totalCarbon.toFixed(2)} kg CO₂e
-          </p>
-        </div>
-        <div className="rounded-xl border border-white/10 bg-white/5 p-3">
-          <p className="text-[11px] uppercase tracking-wide text-shell-fog/80">Delivery Carbon</p>
-          <p className="mt-1 text-base font-semibold text-shell-cream">
-            {item.deliveryCarbon.toFixed(2)} kg CO₂e
-          </p>
-        </div>
-      </div>
-
-      <div className="relative z-10 mt-3 space-y-2 text-sm text-shell-fog">
-        <p className="inline-flex items-center gap-2">
-          <Building2 className="h-4 w-4 text-cyan-200" />
-          {item.restaurantName}
-        </p>
-        {typeof item.price === "number" && (
-          <p className="inline-flex items-center gap-2">
-            <Coins className="h-4 w-4 text-lime-200" />
-            ₹{item.price.toFixed(0)}
-          </p>
-        )}
-        {typeof item.distance === "number" && (
-          <p className="inline-flex items-center gap-2">
-            <MapPinned className="h-4 w-4 text-coral-200" />
-            {item.distance.toFixed(1)} km away
-          </p>
-        )}
-      </div>
-
-      <div className="relative z-10 mt-4">
-        <div className="h-2 w-full overflow-hidden rounded-full bg-white/10">
+          {/* Carbon grade badge — FR-7 */}
           <motion.div
-            className="h-full rounded-full"
-            style={{ backgroundColor: gradeInfo.color }}
-            initial={{ width: 0 }}
-            animate={{ width: `${Math.min((item.totalCarbon / 12) * 100, 100)}%` }}
-            transition={{ duration: 0.8, delay: index * 0.04 + 0.25 }}
-          />
+            whileHover={{ scale: 1.08, rotate: 2 }}
+            className={`flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full text-lg font-black grade-glow-${item.carbonGrade}`}
+            style={{
+              background: gradeInfo.bgColor,
+              color: gradeInfo.color,
+              border: `2px solid ${gradeInfo.color}60`,
+            }}
+          >
+            {item.carbonGrade}
+          </motion.div>
+        </div>
+
+        {/* Carbon metrics row */}
+        <div className="grid grid-cols-2 gap-2 mb-3">
+          <div className="rounded-xl p-2.5" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)" }}>
+            <p className="text-[10px] uppercase tracking-wider mb-1" style={{ color: "#475569" }}>Total Carbon</p>
+            <p className="text-sm font-bold" style={{ color: "#f8fafc" }}>
+              {item.totalCarbon.toFixed(2)}
+              <span className="text-[10px] font-normal ml-1" style={{ color: "#64748b" }}>kg CO₂e</span>
+            </p>
+          </div>
+          <div className="rounded-xl p-2.5" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)" }}>
+            <p className="text-[10px] uppercase tracking-wider mb-1" style={{ color: "#475569" }}>Delivery Carbon</p>
+            <p className="text-sm font-bold" style={{ color: "#f8fafc" }}>
+              {item.deliveryCarbon.toFixed(2)}
+              <span className="text-[10px] font-normal ml-1" style={{ color: "#64748b" }}>kg CO₂e</span>
+            </p>
+          </div>
+        </div>
+
+        {/* Carbon bar */}
+        <div className="mb-3">
+          <div className="h-1.5 w-full rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.07)" }}>
+            <motion.div
+              className="h-full rounded-full"
+              style={{ background: `linear-gradient(90deg, ${gradeInfo.color}cc, ${gradeInfo.color})` }}
+              initial={{ width: 0 }}
+              animate={{ width: `${barPct}%` }}
+              transition={{ duration: 0.9, delay: index * 0.06 + 0.2, ease: [0.4, 0, 0.2, 1] }}
+            />
+          </div>
+        </div>
+
+        {/* Bottom meta row */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            {typeof item.price === "number" && (
+              <span className="inline-flex items-center gap-1 text-xs" style={{ color: "#94a3b8" }}>
+                <Coins className="h-3 w-3" style={{ color: "#bef264" }} />
+                ₹{item.price}
+              </span>
+            )}
+            {typeof item.distance === "number" && (
+              <span className="inline-flex items-center gap-1 text-xs" style={{ color: "#94a3b8" }}>
+                <MapPinned className="h-3 w-3" style={{ color: accentColor }} />
+                {item.distance.toFixed(1)} km
+              </span>
+            )}
+          </div>
+          <span className="inline-flex items-center gap-1 text-xs font-semibold opacity-0 group-hover:opacity-100 transition-opacity"
+            style={{ color: accentColor }}>
+            Details
+            <ChevronRight className="h-3.5 w-3.5" />
+          </span>
         </div>
       </div>
-
-      <div className="relative z-10 mt-4 inline-flex items-center gap-2 text-sm font-semibold text-cyan-100">
-        View details
-        <ArrowUpRight className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
-      </div>
-
-      <div
-        className="pointer-events-none absolute -bottom-14 -right-10 h-28 w-28 rounded-full blur-2xl"
-        style={{ backgroundColor: `${gradeInfo.color}66` }}
-      />
     </motion.div>
   );
 }
