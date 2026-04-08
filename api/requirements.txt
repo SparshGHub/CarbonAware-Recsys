@@ -5,7 +5,7 @@ asyncpg
 databases
 pydantic
 sentence-transformers
-numpy
+numpy<2
 psycopg2-binary
 pytest
 httpx

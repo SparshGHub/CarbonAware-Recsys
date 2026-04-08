@@ -27,6 +27,8 @@ export const getCarbonGrade = (totalCarbonKg: number): CarbonGrade => {
 // API Configuration
 export const API_CONFIG = {
   BASE_URL: process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000",
+  USE_MOCK_API: process.env.NEXT_PUBLIC_USE_MOCK_API === "true",
+  MOCK_API_DELAY_MS: Number(process.env.NEXT_PUBLIC_MOCK_API_DELAY_MS || "220"),
   ENDPOINTS: {
     RECOMMENDATIONS: "/recommend",
     LOCATIONS: "/locations",

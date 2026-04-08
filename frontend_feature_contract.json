@@ -1,0 +1,150 @@
+{
+  "name": "RecSys Frontend Feature Contract",
+  "version": "1.0.0",
+  "purpose": "Canonical feature and behavior spec for frontend generation and implementation",
+  "coreRequirements": [
+    {
+      "id": "FR-1",
+      "title": "City Selection Entry",
+      "userIntent": "User must start by selecting one city from a fixed showcase set.",
+      "requiredBehavior": {
+        "flow": "Initial screen blocks search/results until city is selected.",
+        "choices": ["Mumbai", "Delhi", "Bangalore", "Hyderabad"],
+        "stateTransition": "city_selected -> area_selection"
+      },
+      "acceptanceCriteria": [
+        "Only allowed cities are shown.",
+        "Search and recommendations are not accessible before city selection."
+      ]
+    },
+    {
+      "id": "FR-2",
+      "title": "Area Selection Per City",
+      "userIntent": "User selects a delivery area within selected city.",
+      "requiredBehavior": {
+        "flow": "Area options are dependent on selected city.",
+        "choicesPerCity": "7-8 popular areas for each city.",
+        "stateTransition": "area_selected -> search_enabled"
+      },
+      "acceptanceCriteria": [
+        "Area list changes when city changes.",
+        "User can navigate back and change city."
+      ]
+    },
+    {
+      "id": "FR-3",
+      "title": "Intent Search Input",
+      "userIntent": "User enters food intent query (for example chicken tikka or cheese pizza).",
+      "requiredBehavior": {
+        "input": "Single search text input.",
+        "trigger": ["Search button", "Enter key"],
+        "payloadFields": ["query", "city", "area"]
+      },
+      "acceptanceCriteria": [
+        "Search cannot be submitted without city and area.",
+        "Search submits query plus location context."
+      ]
+    },
+    {
+      "id": "FR-4",
+      "title": "Location-Aware Request Context",
+      "userIntent": "Backend receives location context for delivery-carbon-aware reranking.",
+      "requiredBehavior": {
+        "apiPayload": {
+          "query": "string",
+          "city": "string",
+          "area": "string"
+        },
+        "reason": "Location context enables delivery distance/emission effects in scoring."
+      },
+      "acceptanceCriteria": [
+        "All recommendation requests include city and area.",
+        "City/area shown in UI summary to confirm active context."
+      ]
+    },
+    {
+      "id": "FR-5",
+      "title": "Dual-Model Recommendation Response",
+      "userIntent": "Display top K results from baseline and lifecycle-aware models.",
+      "requiredBehavior": {
+        "models": ["commercial_baseline", "lifecycle_aware"],
+        "k": "configurable top-K",
+        "render": "Side-by-side recommendation lists."
+      },
+      "acceptanceCriteria": [
+        "Both lists are visible together after search.",
+        "Each list renders up to K cards in rank order."
+      ]
+    },
+    {
+      "id": "FR-6",
+      "title": "Two Ranked Lists Side by Side",
+      "userIntent": "User compares rankings directly between models.",
+      "requiredBehavior": {
+        "layout": "Desktop: two columns, Mobile: stacked sections.",
+        "listLabels": ["Commercial Ranking", "Lifecycle-Aware Ranking"],
+        "rankIndicators": "Each item displays rank index."
+      },
+      "acceptanceCriteria": [
+        "Responsive layout remains readable on mobile and desktop.",
+        "Clear visual distinction between both model sections."
+      ]
+    },
+    {
+      "id": "FR-7",
+      "title": "Carbon Grade Badge Per Item",
+      "userIntent": "Each item must expose environmental cost through a clear grade marker.",
+      "requiredBehavior": {
+        "gradeScale": ["A", "B", "C", "D", "E"],
+        "visual": "Color-coded circular badge on each card.",
+        "mapping": "Derived from total carbon value thresholds."
+      },
+      "acceptanceCriteria": [
+        "Every rendered card shows one grade badge.",
+        "Badge color and letter are consistent with grade mapping."
+      ]
+    },
+    {
+      "id": "FR-8",
+      "title": "Lambda Slider Control",
+      "userIntent": "User adjusts weight between commercial relevance and carbon cost.",
+      "requiredBehavior": {
+        "allowedValues": [0, 0.2, 0.5, 0.7, 0.9, 1.0],
+        "display": "Current lambda value and interpretation text are always visible.",
+        "requestField": "lambda"
+      },
+      "acceptanceCriteria": [
+        "Slider only snaps to allowed discrete values.",
+        "Changing slider triggers reranking request with selected lambda."
+      ]
+    },
+    {
+      "id": "FR-9",
+      "title": "Lifecycle-Only Rerank on Lambda Change",
+      "userIntent": "Only lifecycle-aware list updates when lambda changes.",
+      "requiredBehavior": {
+        "onLambdaChange": {
+          "updateCommercialList": false,
+          "updateLifecycleList": true
+        },
+        "apiBehavior": "Send request only for lifecycle-aware mode using same query/city/area with new lambda."
+      },
+      "acceptanceCriteria": [
+        "Commercial list remains stable during lambda updates.",
+        "Lifecycle list refreshes with visual reranking state indicator."
+      ]
+    }
+  ],
+  "frontendOnlyFallbackPlan": {
+    "goal": "Allow full UI demo even when backend is unavailable.",
+    "strategy": [
+      "Use static city/area data for onboarding selectors.",
+      "For recommendation requests, try live API first, then fallback to deterministic mock responses on failure.",
+      "Allow an explicit environment switch to force mock mode for demos."
+    ],
+    "nonGoals": [
+      "No ML validity guarantee in mock mode.",
+      "Mock scores are placeholders and will be replaced by backend outputs later."
+    ]
+  }
+}

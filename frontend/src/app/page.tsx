@@ -1,14 +1,19 @@
 "use client";
 
 import { useState, useCallback, useMemo, useRef } from "react";
-import { motion } from "framer-motion";
-import { Leaf, MapPin, Sparkles, RefreshCw } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Leaf, MapPin, Sparkles, RefreshCw, ChevronDown, Zap, ChevronLeft, Home as HomeIcon } from "lucide-react";
 import CitySelector from "@/components/CitySelector";
 import AreaSelector from "@/components/AreaSelector";
 import SearchBar from "@/components/SearchBar";
 import LambdaSlider from "@/components/LambdaSlider";
 import RecommendationsList from "@/components/RecommendationsList";
 import ItemDetailPlacard from "@/components/ItemDetailPlacard";
+import {
+  getMockRecommendations,
+  type ApiRecommendationItem,
+  type RecommendationMode,
+} from "@/data/mockApi";
 import {
   K_RECOMMENDATIONS,
   API_CONFIG,
@@ -30,22 +35,8 @@ interface FoodItem {
   totalScore?: number;
 }
 
-interface ApiRecommendationItem {
-  id: string | number;
-  name: string;
-  restaurant_name?: string;
-  carbon_score?: number;
-  delivery_carbon?: number;
-  total_carbon?: number;
-  price?: number;
-  distance?: number;
-  relevance_score?: number;
-  total_score?: number;
-}
-
 const normalizeRecommendation = (item: ApiRecommendationItem): FoodItem => {
   const totalCarbon = item.total_carbon ?? item.carbon_score ?? 0;
-
   return {
     id: item.id,
     name: item.name,
@@ -71,22 +62,19 @@ export default function Home() {
   const [loadingRerank, setLoadingRerank] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  const [usingMockData, setUsingMockData] = useState(API_CONFIG.USE_MOCK_API);
   const [baselineRecommendations, setBaselineRecommendations] = useState<FoodItem[]>([]);
   const [carbonAwareRecommendations, setCarbonAwareRecommendations] = useState<FoodItem[]>([]);
   const [selectedItem, setSelectedItem] = useState<FoodItem | null>(null);
   const [showDetailPlacard, setShowDetailPlacard] = useState(false);
   const requestIdRef = useRef(0);
 
-  const hasResults =
-    baselineRecommendations.length > 0 || carbonAwareRecommendations.length > 0;
-
+  const hasResults = baselineRecommendations.length > 0 || carbonAwareRecommendations.length > 0;
   const isBusy = loadingSearch || loadingRerank;
 
   const locationLabel = useMemo(() => {
-    if (!selectedCity || !selectedArea) {
-      return "Select city and area";
-    }
-    return `${selectedCity} • ${selectedArea}`;
+    if (!selectedCity || !selectedArea) return null;
+    return `${selectedCity} · ${selectedArea}`;
   }, [selectedCity, selectedArea]);
 
   const handleCitySelect = useCallback((city: string) => {
@@ -99,7 +87,7 @@ export default function Home() {
     setCurrentStep("search");
   }, []);
 
-  const handleChangeLocation = useCallback(() => {
+  const handleHome = useCallback(() => {
     setCurrentStep("city");
     setSelectedCity("");
     setSelectedArea("");
@@ -110,8 +98,12 @@ export default function Home() {
     setCarbonAwareRecommendations([]);
   }, []);
 
+  const handleBackToArea = useCallback(() => {
+    setCurrentStep("area");
+  }, []);
+
   const fetchRecommendations = useCallback(
-    async (mode: "commercial" | "lifecycle_aware", lambdaValue: number) => {
+    async (mode: RecommendationMode, lambdaValue: number) => {
       const params = new URLSearchParams({
         query: searchQuery.trim(),
         city: selectedCity,
@@ -119,86 +111,87 @@ export default function Home() {
         mode,
         limit: String(K_RECOMMENDATIONS),
       });
+      if (mode === "lifecycle_aware") params.set("lambda", String(lambdaValue));
 
-      // Backend may choose to honor lambda only for lifecycle mode.
-      if (mode === "lifecycle_aware") {
-        params.set("lambda", String(lambdaValue));
+      if (API_CONFIG.USE_MOCK_API) {
+        const mockData = await getMockRecommendations({
+          query: searchQuery.trim(),
+          city: selectedCity,
+          area: selectedArea,
+          mode,
+          lambdaValue,
+          limit: K_RECOMMENDATIONS,
+        });
+        setUsingMockData(true);
+        return mockData.map(normalizeRecommendation).slice(0, K_RECOMMENDATIONS);
       }
 
-      const response = await fetch(
-        `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.RECOMMENDATIONS}?${params.toString()}`,
-        { method: "GET" }
-      );
-
-      if (!response.ok) {
-        throw new Error(`Failed to fetch ${mode} recommendations`);
+      try {
+        const response = await fetch(
+          `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.RECOMMENDATIONS}?${params.toString()}`,
+          { method: "GET" }
+        );
+        if (!response.ok) throw new Error(`Failed to fetch ${mode} recommendations`);
+        const data = (await response.json()) as ApiRecommendationItem[];
+        setUsingMockData(false);
+        return data.map(normalizeRecommendation).slice(0, K_RECOMMENDATIONS);
+      } catch (error) {
+        console.warn("Falling back to mock:", error);
+        const mockData = await getMockRecommendations({
+          query: searchQuery.trim(),
+          city: selectedCity,
+          area: selectedArea,
+          mode,
+          lambdaValue,
+          limit: K_RECOMMENDATIONS,
+        });
+        setUsingMockData(true);
+        return mockData.map(normalizeRecommendation).slice(0, K_RECOMMENDATIONS);
       }
-
-      const data = (await response.json()) as ApiRecommendationItem[];
-      return data.map(normalizeRecommendation).slice(0, K_RECOMMENDATIONS);
     },
     [searchQuery, selectedCity, selectedArea]
   );
 
   const handleSearch = useCallback(async () => {
     if (!selectedCity || !selectedArea || !searchQuery.trim()) return;
-
     const requestId = ++requestIdRef.current;
     setLoadingSearch(true);
     setErrorMessage("");
     setHasSearched(true);
-
     try {
       const [baselineItems, carbonItems] = await Promise.all([
         fetchRecommendations("commercial", lambda),
         fetchRecommendations("lifecycle_aware", lambda),
       ]);
-
-      // Ignore stale response if a newer request was fired.
       if (requestId !== requestIdRef.current) return;
-
       setBaselineRecommendations(baselineItems);
       setCarbonAwareRecommendations(carbonItems);
     } catch (error) {
       console.error("Search error:", error);
       setBaselineRecommendations([]);
       setCarbonAwareRecommendations([]);
-      setErrorMessage(
-        "Could not fetch recommendations right now. Please check API availability and try again."
-      );
+      setErrorMessage("Could not fetch recommendations. Please check API availability and try again.");
     } finally {
-      if (requestId === requestIdRef.current) {
-        setLoadingSearch(false);
-      }
+      if (requestId === requestIdRef.current) setLoadingSearch(false);
     }
   }, [selectedCity, selectedArea, searchQuery, lambda, fetchRecommendations]);
 
   const handleLambdaChange = useCallback(
     async (newLambda: number) => {
       setLambda(newLambda);
-
-      // Lambda changes should only rerank lifecycle-aware results.
       if (!hasSearched || !selectedCity || !selectedArea || !searchQuery.trim()) return;
-
       const requestId = ++requestIdRef.current;
       setLoadingRerank(true);
       setErrorMessage("");
-
       try {
         const lifecycleItems = await fetchRecommendations("lifecycle_aware", newLambda);
-
         if (requestId !== requestIdRef.current) return;
-
         setCarbonAwareRecommendations(lifecycleItems);
       } catch (error) {
         console.error("Lambda update error:", error);
-        setErrorMessage(
-          "Could not update lifecycle-aware ranking for the selected lambda value."
-        );
+        setErrorMessage("Could not update lifecycle-aware ranking.");
       } finally {
-        if (requestId === requestIdRef.current) {
-          setLoadingRerank(false);
-        }
+        if (requestId === requestIdRef.current) setLoadingRerank(false);
       }
     },
     [hasSearched, selectedCity, selectedArea, searchQuery, fetchRecommendations]
@@ -210,95 +203,243 @@ export default function Home() {
   };
 
   return (
-    <main className="relative min-h-screen overflow-hidden bg-shell-ink text-shell-cream">
+    <main className="relative min-h-screen overflow-x-hidden" style={{ background: "#060b1d" }}>
+      {/* Background layers */}
       <div className="aurora-bg" aria-hidden="true" />
+      <div className="grain-overlay" aria-hidden="true" />
       <div className="orb orb-lime" aria-hidden="true" />
       <div className="orb orb-cyan" aria-hidden="true" />
       <div className="orb orb-coral" aria-hidden="true" />
+      <div className="orb orb-violet" aria-hidden="true" />
 
-      {/* Header */}
+      {/* ── HEADER ── */}
       <motion.header
-        initial={{ opacity: 0, y: -20 }}
+        initial={{ opacity: 0, y: -16 }}
         animate={{ opacity: 1, y: 0 }}
-        className="sticky top-0 z-40 border-b border-white/10 bg-shell-ink/80 backdrop-blur-xl"
+        transition={{ duration: 0.5, ease: [0.4, 0, 0.2, 1] }}
+        className="sticky top-0 z-40"
+        style={{
+          background: "rgba(6,11,29,0.75)",
+          backdropFilter: "blur(20px)",
+          borderBottom: "1px solid rgba(255,255,255,0.07)",
+          boxShadow: "0 4px 24px rgba(0,0,0,0.3)",
+        }}
       >
-        <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-7xl px-4 py-3.5 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="rounded-2xl border border-lime-300/30 bg-lime-300/15 p-2.5 shadow-[0_0_40px_rgba(190,242,100,0.2)]">
-                <Leaf className="h-6 w-6 text-lime-200" />
+            {/* Logo */}
+            <button 
+              onClick={handleHome}
+              className="flex items-center gap-3 text-left transition-transform hover:scale-[1.02]"
+            >
+              <div
+                className="flex h-9 w-9 items-center justify-center rounded-xl"
+                style={{
+                  background: "linear-gradient(135deg, rgba(132,204,22,0.25) 0%, rgba(16,185,129,0.2) 100%)",
+                  border: "1px solid rgba(132,204,22,0.35)",
+                  boxShadow: "0 0 20px rgba(132,204,22,0.2)",
+                }}
+              >
+                <Leaf className="h-5 w-5" style={{ color: "#bef264" }} />
               </div>
               <div>
-                <h1 className="font-display text-2xl font-semibold tracking-tight text-shell-cream">
+                <h1 className="font-display text-lg font-bold tracking-tight" style={{ color: "#f8fafc" }}>
                   EcoRecSys
                 </h1>
-                <p className="text-xs text-shell-fog">
-                  Carbon-aware recommendations for real delivery locations
+                <p className="text-[11px] leading-none" style={{ color: "#475569" }}>
+                  Carbon-aware recommendations
                 </p>
               </div>
-            </div>
+            </button>
 
-            {currentStep === "search" && (
+            {/* Location pill + change button */}
+            <div className="flex items-center gap-3">
+              {/* FR-4: location context always shown */}
+              <AnimatePresence>
+                {locationLabel && (
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.9 }}
+                    className="hidden sm:flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-semibold"
+                    style={{
+                      background: "rgba(34,211,238,0.08)",
+                      border: "1px solid rgba(34,211,238,0.22)",
+                      color: "#67e8f9",
+                    }}
+                  >
+                    <MapPin className="h-3 w-3" />
+                    {locationLabel}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              {currentStep === "search" && (
+                <motion.button
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  onClick={handleBackToArea}
+                  whileHover={{ y: -1 }}
+                  className="inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-semibold transition-colors"
+                  style={{
+                    background: "rgba(255,255,255,0.06)",
+                    border: "1px solid rgba(255,255,255,0.1)",
+                    color: "#94a3b8",
+                  }}
+                >
+                  <ChevronLeft className="h-3.5 w-3.5" />
+                  Back
+                </motion.button>
+              )}
+
               <motion.button
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
-                onClick={handleChangeLocation}
-                className="inline-flex items-center gap-2 rounded-xl border border-white/20 bg-white/10 px-4 py-2 text-sm font-semibold text-shell-cream transition hover:border-cyan-300/60 hover:bg-cyan-300/10"
+                onClick={handleHome}
+                whileHover={{ y: -1 }}
+                className="inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-semibold transition-colors"
+                style={{
+                  background: "rgba(255,255,255,0.06)",
+                  border: "1px solid rgba(255,255,255,0.1)",
+                  color: "#94a3b8",
+                }}
               >
-                <MapPin className="h-4 w-4" />
-                Change Location
+                <HomeIcon className="h-3.5 w-3.5" />
+                Home
               </motion.button>
-            )}
+            </div>
           </div>
         </div>
       </motion.header>
 
-      {/* Main Content */}
-      <div className="relative z-10 mx-auto flex w-full max-w-7xl flex-col gap-8 px-4 py-8 sm:px-6 lg:px-8">
-        <motion.section
-          initial={{ opacity: 0, y: 24 }}
+      {/* ── HERO ── */}
+      <div className="relative z-10 mx-auto max-w-7xl px-4 pb-4 pt-16 sm:px-6 lg:px-8">
+        <motion.div
+          initial={{ opacity: 0, y: 32 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-          className="card-shell text-center"
+          transition={{ delay: 0.1, duration: 0.6, ease: [0.4, 0, 0.2, 1] }}
+          className="text-center"
         >
-          <div className="mx-auto mb-4 inline-flex items-center gap-2 rounded-full border border-coral-300/40 bg-coral-400/15 px-4 py-1.5 text-xs font-semibold tracking-wide text-coral-100">
-            <Sparkles className="h-4 w-4" />
-            Choose cleaner meals without losing taste
+          {/* Badge */}
+          <div className="mb-6 inline-flex items-center gap-2 rounded-full px-4 py-2 text-xs font-semibold tracking-wide"
+            style={{
+              background: "linear-gradient(135deg, rgba(132,204,22,0.12) 0%, rgba(34,211,238,0.12) 100%)",
+              border: "1px solid rgba(132,204,22,0.25)",
+              color: "#bef264",
+            }}
+          >
+            <Sparkles className="h-3.5 w-3.5" />
+            Lifecycle Carbon-Aware Recommendation Engine
           </div>
-          <h2 className="font-display text-3xl leading-tight text-shell-cream sm:text-4xl">
-            Compare commercial picks vs lifecycle-aware picks
+
+          {/* Main heading */}
+          <h2 className="font-display mx-auto max-w-3xl text-4xl font-bold leading-tight sm:text-5xl"
+            style={{ color: "#f8fafc", letterSpacing: "-0.02em" }}>
+            Compare{" "}
+            <span style={{
+              background: "linear-gradient(135deg, #fb923c 0%, #fbbf24 100%)",
+              WebkitBackgroundClip: "text",
+              WebkitTextFillColor: "transparent",
+              backgroundClip: "text",
+            }}>commercial</span>{" "}
+            vs{" "}
+            <span style={{
+              background: "linear-gradient(135deg, #22d3ee 0%, #84cc16 100%)",
+              WebkitBackgroundClip: "text",
+              WebkitTextFillColor: "transparent",
+              backgroundClip: "text",
+            }}>lifecycle-aware</span>{" "}
+            picks
           </h2>
-          <p className="mx-auto mt-3 max-w-3xl text-sm text-shell-fog sm:text-base">
-            Select your city and area, search your food intent, and tune lambda to control
-            how strongly carbon emissions affect ranking.
+
+          <p className="mx-auto mt-4 max-w-2xl text-base sm:text-lg" style={{ color: "#64748b" }}>
+            Select your city and delivery area, describe your food intent, and tune the lambda slider to control how strongly carbon footprint shapes recommendations.
           </p>
-          <div className="mx-auto mt-6 flex w-fit flex-wrap items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm text-shell-cream">
-            <MapPin className="h-4 w-4 text-cyan-200" />
-            <span className="font-semibold">{locationLabel}</span>
+
+          {/* Step indicators */}
+          <div className="mt-8 flex items-center justify-center gap-2">
+            {(["city", "area", "search"] as const).map((step, i) => {
+              const stepIdx = ["city", "area", "search"].indexOf(currentStep);
+              const isActive = step === currentStep;
+              const isDone = i < stepIdx;
+              return (
+                <div key={step} className="flex items-center gap-2">
+                  <div
+                    className="flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold transition-all duration-300"
+                    style={{
+                      background: isDone
+                        ? "rgba(132,204,22,0.2)"
+                        : isActive
+                        ? "rgba(34,211,238,0.15)"
+                        : "rgba(255,255,255,0.05)",
+                      border: isDone
+                        ? "1px solid rgba(132,204,22,0.4)"
+                        : isActive
+                        ? "1px solid rgba(34,211,238,0.4)"
+                        : "1px solid rgba(255,255,255,0.08)",
+                      color: isDone ? "#bef264" : isActive ? "#67e8f9" : "#334155",
+                    }}
+                  >
+                    {isDone ? "✓" : i + 1}
+                  </div>
+                  <span className="text-xs font-medium hidden sm:block capitalize"
+                    style={{ color: isActive ? "#94a3b8" : isDone ? "#475569" : "#334155" }}>
+                    {step === "city" ? "City" : step === "area" ? "Area" : "Search"}
+                  </span>
+                  {i < 2 && (
+                    <div className="mx-1 h-px w-6 sm:w-10 transition-all duration-300"
+                      style={{ background: isDone ? "rgba(132,204,22,0.3)" : "rgba(255,255,255,0.07)" }} />
+                  )}
+                </div>
+              );
+            })}
           </div>
-        </motion.section>
 
-        {/* Step: City & Area Selection */}
-        <CitySelector
-          isOpen={currentStep === "city"}
-          onSelect={handleCitySelect}
-        />
+          {/* Scroll hint */}
+          {currentStep === "search" && hasResults && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 1 }}
+              className="mt-6 flex justify-center"
+            >
+              <div className="flex flex-col items-center gap-1 text-xs" style={{ color: "#334155" }}>
+                <ChevronDown className="h-4 w-4 animate-bounce" />
+                scroll to results
+              </div>
+            </motion.div>
+          )}
+        </motion.div>
+      </div>
 
-        <AreaSelector
-          isOpen={currentStep === "area"}
-          city={selectedCity}
-          onSelect={handleAreaSelect}
-          onBack={() => setCurrentStep("city")}
-        />
+      {/* ── SELECTORS (fullscreen modals) ── */}
+      <CitySelector isOpen={currentStep === "city"} onSelect={handleCitySelect} />
+      <AreaSelector
+        isOpen={currentStep === "area"}
+        city={selectedCity}
+        onSelect={handleAreaSelect}
+        onBack={() => setCurrentStep("city")}
+      />
 
-        {/* Step: Search & Results */}
+      {/* ── SEARCH + RESULTS ── */}
+      <AnimatePresence>
         {currentStep === "search" && (
           <motion.div
+            key="search-panel"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="space-y-6"
+            exit={{ opacity: 0 }}
+            className="relative z-10 mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 pb-16 sm:px-6 lg:px-8"
           >
-            {/* Search Bar */}
+            {/* Mobile location pill */}
+            {locationLabel && (
+              <div className="flex sm:hidden items-center justify-center gap-2 rounded-full px-4 py-2 text-xs font-semibold mx-auto"
+                style={{ background: "rgba(34,211,238,0.08)", border: "1px solid rgba(34,211,238,0.22)", color: "#67e8f9" }}>
+                <MapPin className="h-3 w-3" />
+                {locationLabel}
+              </div>
+            )}
+
             <SearchBar
               value={searchQuery}
               onChange={setSearchQuery}
@@ -308,81 +449,113 @@ export default function Home() {
               area={selectedArea}
             />
 
-            {errorMessage && (
-              <div className="mx-auto w-full max-w-4xl rounded-2xl border border-coral-300/50 bg-coral-400/15 px-4 py-3 text-sm text-coral-50">
-                {errorMessage}
-              </div>
-            )}
+            {/* Error */}
+            <AnimatePresence>
+              {errorMessage && (
+                <motion.div
+                  initial={{ opacity: 0, y: -8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0 }}
+                  className="mx-auto w-full max-w-4xl rounded-2xl px-5 py-3.5 text-sm"
+                  style={{
+                    background: "rgba(239,68,68,0.08)",
+                    border: "1px solid rgba(239,68,68,0.3)",
+                    color: "#fca5a5",
+                  }}
+                >
+                  {errorMessage}
+                </motion.div>
+              )}
+            </AnimatePresence>
 
-            {/* Lambda Slider */}
-            <LambdaSlider
-              value={lambda}
-              onChange={handleLambdaChange}
-              loading={isBusy}
-            />
 
-            {/* Results with Lambda Slider */}
-            {hasResults ? (
-              <RecommendationsList
-                baselineItems={baselineRecommendations}
-                carbonAwareItems={carbonAwareRecommendations}
-                onViewDetails={handleViewDetails}
-                loading={loadingSearch}
-                reranking={loadingRerank}
-                k={K_RECOMMENDATIONS}
-              />
-            ) : null}
 
-            {!hasResults && hasSearched && !loadingSearch && (
-              <div className="mx-auto w-full max-w-4xl rounded-3xl border border-white/10 bg-white/5 px-6 py-10 text-center">
-                <p className="text-lg font-semibold text-shell-cream">No recommendations yet</p>
-                <p className="mt-2 text-sm text-shell-fog">
-                  Try a broader food query like "pizza", "biryani" or "salad".
-                </p>
-              </div>
-            )}
+            {/* Lambda Slider — FR-8 */}
+            <LambdaSlider value={lambda} onChange={handleLambdaChange} loading={isBusy} />
 
-            {!hasSearched && (
-              <div className="mx-auto w-full max-w-4xl rounded-3xl border border-cyan-300/30 bg-cyan-300/10 px-6 py-4 text-center text-sm text-cyan-100">
-                Search once to load both recommendation lists, then fine-tune lifecycle ranking
-                with lambda.
-              </div>
-            )}
+            {/* Pre-search prompt */}
+            <AnimatePresence>
+              {!hasSearched && (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="mx-auto w-full max-w-4xl rounded-2xl px-6 py-5 text-center"
+                  style={{
+                    background: "rgba(34,211,238,0.05)",
+                    border: "1px solid rgba(34,211,238,0.15)",
+                  }}
+                >
+                  <p className="text-sm" style={{ color: "#67e8f9" }}>
+                    Search once to load both recommendation lists, then fine-tune lifecycle ranking with the lambda slider.
+                  </p>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* Results — FR-5, FR-6 */}
+            <AnimatePresence>
+              {hasResults || loadingSearch ? (
+                <RecommendationsList
+                  baselineItems={baselineRecommendations}
+                  carbonAwareItems={carbonAwareRecommendations}
+                  onViewDetails={handleViewDetails}
+                  loading={loadingSearch}
+                  reranking={loadingRerank}
+                  k={K_RECOMMENDATIONS}
+                />
+              ) : hasSearched && !loadingSearch ? (
+                <motion.div
+                  initial={{ opacity: 0, y: 16 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="mx-auto w-full max-w-4xl rounded-3xl px-6 py-12 text-center"
+                  style={{
+                    background: "rgba(255,255,255,0.03)",
+                    border: "1px solid rgba(255,255,255,0.07)",
+                  }}
+                >
+                  <p className="text-lg font-bold" style={{ color: "#f8fafc" }}>No recommendations found</p>
+                  <p className="mt-2 text-sm" style={{ color: "#475569" }}>
+                    Try a broader query like "pizza", "biryani", or "salad".
+                  </p>
+                </motion.div>
+              ) : null}
+            </AnimatePresence>
           </motion.div>
         )}
-      </div>
+      </AnimatePresence>
 
-      {/* Item Detail Placard */}
+      {/* ── DETAIL MODAL ── */}
       <ItemDetailPlacard
         item={selectedItem}
         isOpen={showDetailPlacard}
         onClose={() => setShowDetailPlacard(false)}
       />
 
-      {/* Footer */}
-      <motion.footer
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.5 }}
-        className="relative z-10 mt-16 border-t border-white/10 bg-shell-ink/60"
+      {/* ── FOOTER ── */}
+      <footer
+        className="relative z-10 mt-8"
+        style={{ borderTop: "1px solid rgba(255,255,255,0.06)", background: "rgba(6,11,29,0.7)" }}
       >
         <div className="mx-auto max-w-7xl px-4 py-8 text-center sm:px-6 lg:px-8">
-          <div className="text-sm text-shell-fog">
-            <p>
-              Making sustainable food choices, one recommendation at a time.
-            </p>
-            <p className="mt-2 text-xs text-shell-fog/80">
-              Powered by lifecycle carbon-aware recommendation models
-            </p>
-            {isBusy && (
-              <p className="mt-3 inline-flex items-center gap-2 rounded-full border border-lime-200/30 bg-lime-300/10 px-3 py-1 text-xs font-semibold text-lime-100">
-                <RefreshCw className="h-3.5 w-3.5 animate-spin" />
-                Updating recommendation engine
-              </p>
-            )}
+          <div className="flex items-center justify-center gap-2 mb-2">
+            <Leaf className="h-4 w-4" style={{ color: "#84cc16" }} />
+            <span className="text-sm font-semibold" style={{ color: "#475569" }}>
+              Making sustainable food choices, one recommendation at a time
+            </span>
           </div>
+          <p className="text-xs" style={{ color: "#334155" }}>
+            Powered by lifecycle carbon-aware dual-model recommendation engine
+          </p>
+          {isBusy && (
+            <div className="mt-3 inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold"
+              style={{ background: "rgba(132,204,22,0.08)", border: "1px solid rgba(132,204,22,0.2)", color: "#bef264" }}>
+              <RefreshCw className="h-3 w-3 animate-spin-slow" />
+              Updating recommendation engine
+            </div>
+          )}
         </div>
-      </motion.footer>
+      </footer>
     </main>
   );
 }
