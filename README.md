@@ -211,11 +211,13 @@ This starts:
 cd frontend
 npm install
 npm run dev  # http://localhost:3000
+# Frontend-only demo mode (no backend required)
+NEXT_PUBLIC_USE_MOCK_API=true npm run dev
 
 # Backend
 cd api
 pip install -r requirements.txt
-python main.py  # http://localhost:8000
+python3 main.py  # http://localhost:8000
 ```
 
 ---
